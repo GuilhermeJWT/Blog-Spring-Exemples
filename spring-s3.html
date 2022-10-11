@@ -36,7 +36,7 @@
                     <div class="col-lg-3 col-md-4">
                         <div class="b-logo">
                             <a href="index.html">
-                                <img src="img/logo.png" alt="Logo">
+                                <img src="img/logo2.png" alt="Logo">
                             </a>
                         </div>
                     </div>
@@ -86,10 +86,10 @@
                                 </div>
                                 <p></p>
                                 <p>
-                                    Olá Seres Java, hoje iremos dar inicio ao processo de como utilizar o serviço de arquivos da Amazon S3 com SpringBoot.
+                                    <b>Olá Seres Java, hoje iremos dar inicio ao processo de como utilizar o serviço de arquivos da Amazon S3 com SpringBoot.</b>
                                 </p>
                                 <p>
-                                    1º Passo - temos que ir no console da Aws e pesquisar por S3, logo em seguida criar um Bucket, onde ficará os arquivos pelo link:
+                                    <b>1º Passo - temos que ir no console da Aws e pesquisar por S3, logo em seguida criar um Bucket, onde ficará os arquivos pelo link:</b>
                                 </p>
                                  <p>
                                     <a href="https://s3.console.aws.amazon.com/s3/bucket/create?region=us-east-1">Link de criação do Bucket na AWS</a>
@@ -97,17 +97,207 @@
                                 <div class="sn-img">
                                 <img src="img/springaws/bucket1.png" height="485" width="805"/>
                                 </div>
-                                <p>Seja criativo ao escolher o nome do Bucket, pois a AWS tem milhões criados! <p>
+                                <p></p>
+                                <p><b>Seja criativo ao escolher o nome do Bucket, pois a AWS tem milhões criados!</b> <p>
                                     
-                                </p>2º Passo - na tela seguinte nos deparamos com 2 configurações do Bucket que é a Criptografia e Versionamento, para testes vamos deixar essas duas opções desativadas e depois disso só finalizar!<p>
+                                </p><b>2º Passo - na tela seguinte nos deparamos com 2 configurações do Bucket que é a Criptografia e Versionamento, para testes vamos deixar essas duas opções desativadas e depois disso só finalizar!</b><p>
                                 <p>
                                     <div class="sn-img">
                                     <img src="img/springaws/bucket2.png" height="629" width="640"/>
                                 </div>
                                 </p>
 
-                                </p>Agora vamos no nosso projeto e no arquivo pom.xml vamos adicionar as depedências necessárias:<p>
+                                </p><b>Agora vamos no nosso projeto e no arquivo pom.xml vamos adicionar as depedências necessárias:</b><p>
 
+                                <pre><code class="language-xml">&lt;<font color="#3333ff">dependency</font>&gt;
+    &lt;groupId&gt;com.amazonaws&lt;/groupId&gt;
+    &lt;artifactId&gt;aws-java-sdk&lt;/artifactId&gt;
+    &lt;version&gt;1.11.163&lt;/version&gt;
+&lt;<font color="#3333ff">/dependency</font>&gt;</code></pre> 
+<pre><code class="language-xml">&lt;<font color="#3333ff">dependency</font>&gt;
+    &lt;groupId&gt;commons-io&lt;/groupId&gt;
+    &lt;artifactId&gt;commons-io&lt;/artifactId&gt;
+    &lt;version&gt;2.11.0&lt;/version&gt;
+&lt;<font color="#3333ff">/dependency</font>&gt;</code></pre>
+
+                            <p><b>Vamos criar uma classe de Configuração chamada AwsS3Configuration:</b></p>
+                            <p>
+                                <pre>
+<font color="#dc143c">package</font>  br.com.systemsgs.s3.config;
+
+<font color="#dc143c">import</font> com.amazonaws.auth.AWSCredentials;
+<font color="#dc143c">import</font> com.amazonaws.auth.AWSStaticCredentialsProvider;
+<font color="#dc143c">import</font> com.amazonaws.auth.BasicAWSCredentials;
+<font color="#dc143c">import</font> com.amazonaws.regions.Regions;
+<font color="#dc143c">import</font> com.amazonaws.services.s3.AmazonS3;
+<font color="#dc143c">import</font> com.amazonaws.services.s3.AmazonS3ClientBuilder;
+<font color="#dc143c">import</font> org.springframework.context.annotation.Bean;
+<font color="#dc143c">import</font> org.springframework.context.annotation.Configuration;
+
+<font color="#996633">@Configuration</font>
+<font color="#3333ff">public</font> class AwsS3Configuration {
+
+    <font color="#dc143c">/* Insira o Usuário e Senha configurado no IAM da Aws */</font>
+    <font color="#3333ff">public</font> AWSCredentials credentials() {
+        AWSCredentials awsCredentials = new BasicAWSCredentials
+                ("user_iam_aws", "password_iam_aws");
+        <font color="#dc143c">return</font> awsCredentials;
+    }
+
+    <font color="#996633">@Bean</font>
+    <font color="#3333ff">public</font> AmazonS3 amazonS3() {
+        AmazonS3 s3client = AmazonS3ClientBuilder
+                .standard()
+                .withCredentials(new AWSStaticCredentialsProvider(credentials()))
+                .withRegion(Regions.US_EAST_1)
+                .build();
+        <font color="#dc143c">return</font> s3client;
+    }
+
+}
+</pre>
+                            </p>
+
+                            <p>
+                               <b>Após realizar a configuração do S3 vamos precisar criar uma camada de Service para criarmos nossos métodos:</b>
+                            </p>
+
+                            <p>
+                                <pre>
+<font color="#dc143c">package</font> br.com.systemsgs.s3.service;
+
+<font color="#dc143c">import</font> com.amazonaws.AmazonServiceException;
+<font color="#dc143c">import</font> com.amazonaws.services.s3.AmazonS3;
+<font color="#dc143c">import</font> com.amazonaws.services.s3.model.*;
+<font color="#dc143c">import</font> lombok.extern.slf4j.Slf4j;
+<font color="#dc143c">import</font> org.apache.commons.io.FileUtils;
+<font color="#dc143c">import</font> org.springframework.stereotype.Service;
+
+<font color="#dc143c">import</font> java.io.File;
+<font color="#dc143c">import</font> java.io.IOException;
+<font color="#dc143c">import</font> java.util.List;
+
+<font color="#996633">@Service</font>
+<font color="#996633">@Slf4</font>
+<font color="#3333ff">public</font> class AwsS3Service {
+
+    <font color="#3333ff">private</font> final AmazonS3 amazonS3Client;
+
+    <font color="#3333ff">public</font> AwsS3Service(AmazonS3 amazonS3Client) {
+        this.amazonS3Client = amazonS3Client;
+    }
+
+    <font color="#dc143c">/* Lista os Buckets que foram criados por você na Aws */</font>
+    <font color="#3333ff">public</font> List<Bucket> listarBuckets(){
+        <font color="#dc143c">return</font> amazonS3Client.listBuckets();
+    }
+
+    <font color="#dc143c">/* Cria um novo Bucket */</font>
+    <font color="#3333ff">public</font> void criaBucketS3(String bucketName) {
+        if(amazonS3Client.doesBucketExist(bucketName)) {
+            log.info("Já possui um Bucket com esse nome!");
+            <font color="#dc143c">return</font>;
+        }
+        amazonS3Client.createBucket(bucketName);
+    }
+
+    <font color="#dc143c">/*Deleta um Bucket pelo Nome*/</font>
+    <font color="#3333ff">public</font> void deleteBucket(String bucketName){
+        try {
+            amazonS3Client.deleteBucket(bucketName);
+        } catch (AmazonServiceException e) {
+            log.error(e.getErrorMessage());
+            <font color="#dc143c">return</font>;
+        }
+    }
+
+    <font color="#dc143c">/*Download de um Arquivo no S3 - primeiro busca pelo bucket e nome do arquivo*/</font>
+    <font color="#3333ff">public</font> void downloadObject(String bucketName, String objectName){
+        S3Object s3object = amazonS3Client.getObject(bucketName, objectName);
+        S3ObjectInputStream inputStream = s3object.getObjectContent();
+        try {
+            FileUtils.copyInputStreamToFile(inputStream,
+             new File("." + File.separator + objectName));
+        } catch (IOException e) {
+            log.error("Erro ao realizar Download do Arquivo " + e.getMessage());
+        }
+    }
+
+    <font color="#dc143c">/* Deleta arquivo no S3 - pelo Bucket e nome do arquivo */</font>
+    <font color="#3333ff">public</font> void deletaArquivo(String bucketName, String objectName){
+        amazonS3Client.deleteObject(bucketName, objectName);
+    }
+
+}
+                                </pre>
+                            </p>
+
+                            <p>
+                                <b>Agora precisamos criar nossos controllres (Api) para testar:</b>
+                            </p>
+
+                            <pre>
+<font color="#3333ff">public</font>  br.com.systemsgs.s3.controller;
+
+<font color="#dc143c">import</font> br.com.systemsgs.s3.service.AwsS3Service;
+<font color="#dc143c">import</font> com.amazonaws.services.s3.model.Bucket;
+<font color="#dc143c">import</font> org.springframework.web.bind.annotation.*;
+
+<font color="#dc143c">import</font> java.io.File;
+<font color="#dc143c">import</font> java.io.IOException;
+<font color="#dc143c">import</font> java.util.List;
+<font color="#dc143c">import</font> java.util.stream.Collectors;
+
+<font color="#996633">@RestController</font>
+<font color="#996633">@RequestMapping</font>(value = <font color="#009933">"/api/bucket"</font>)
+<font color="#3333ff">public</font> class AwsS3Controller {
+
+    <font color="#3333ff">private</font> final AwsS3Service awsS3Service;
+
+    <font color="#3333ff">public</font> AwsS3Controller(AwsS3Service awsS3Service) {
+        this.awsS3Service = awsS3Service;
+    }
+
+    <font color="#996633">@PostMapping</font>(value = <font color="#009933">"/{bucketName}"</font>)
+    <font color="#3333ff">public</font> void criaBucket(@PathVariable String bucketName){
+        awsS3Service.criaBucketS3(bucketName);
+    }
+
+    <font color="#996633">@GetMapping</font>(value = <font color="#009933">"/listaBuckets"</font>)
+    <font color="#3333ff">public</font> List<String> listaBuckets(){
+        var buckets = awsS3Service.listarBuckets();
+        var names = buckets.stream().map(Bucket::getName).collect(Collectors.toList());
+        <font color="#dc143c">return</font> names;
+    }
+
+    <font color="#996633">@GetMapping</font>(value = <font color="#009933">"/{bucketName}/objects/{objectName}"</font>)
+    <font color="#3333ff">public</font> File downloadObject(@PathVariable String bucketName, @PathVariable String objectName) throws IOException {
+        awsS3Service.downloadObject(bucketName, objectName);
+        <font color="#dc143c">return</font> new File("./" + objectName);
+    }
+
+    <font color="#996633">@DeleteMapping</font>(value = <font color="#009933">"/{bucketName}"</font>)
+    <font color="#3333ff">public</font> void deleteBucket(@PathVariable String bucketName){
+        awsS3Service.deleteBucket(bucketName);
+    }
+
+}
+                            </pre>
+                            <p>
+                                <b>Rotas para Teste no Postman:</b>
+                            </p>
+                            <p>
+                                Criar Bucket POST <font color="#009933">localhost:8080/api/bucket/{BUCKET_NAME}</font>
+                            </p>
+                            <p>
+                                Listar Buckets GET <font color="#009933">localhost:8080/api/bucket/listaBuckets</font>
+                            </p>
+                            <p>
+                                Download GET <font color="#009933">localhost:8080/api/bucket/{BUCKET_NAME}/objects/{OBJECT_NAME}</font>
+                            </p>
+                            <p>
+                                Deletar Bucket DELETE <font color="#009933">localhost:8080/api/bucket/{BUCKET_NAME}</font>
+                            </p>
 
                             </div>
                         </div>
